@@ -41,13 +41,13 @@ app.get("/callback", async (req, res) => {
     console.log("Error when getting token::", data.error);
     console.log("Description:", data.error_description);
   }
-  console.log(data)
+  console.log(data);
   res.redirect(`http://localhost:5173`);
 });
 
 app.get("/speech", async (req, res) => {
   const text = req.query.text;
-})
+});
 
 // Start server
 app.listen(PORT, () => {
