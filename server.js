@@ -1,15 +1,26 @@
 import express, { response } from "express";
 import dotenv from "dotenv";
 import OpenAI from "openai";
+import { getEvents } from "./calendar.js";
+import { google } from "googleapis";
+import { oauth2 } from "googleapis/build/src/apis/oauth2/index.js";
 
+console.log(process.env.OPENAI_API_KEY);
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey:
+    "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",
 });
 
 dotenv.config();
 const app = express();
 
 const PORT = 3000;
+
+const oauth2Client = new google.auth.OAuth2(
+  process.env.GOOGLE_CLIENT_ID,
+  process.env.GOOGLE_CLIENT_SECRET,
+  process.env.REDIRECT_URI,
+);
 
 // Routes
 app.get("/callback", async (req, res) => {
@@ -35,18 +46,207 @@ app.get("/callback", async (req, res) => {
     }),
   });
   const data = await response.json();
+  oauth2Client.setCredentials({
+    access_token: data.access_token,
+  });
 
   // Handle errors
   if (!data.access_token) {
     console.log("Error when getting token::", data.error);
     console.log("Description:", data.error_description);
   }
-  console.log(data);
+
   res.redirect(`http://localhost:5173`);
 });
 
 app.get("/speech", async (req, res) => {
   const text = req.query.text;
+  console.log(text);
+
+  const input = [{ role: "user", content: text }];
+  const tools = [
+    {
+      type: "function",
+      name: "getEvents",
+      description: "Get calendar events within a time range.",
+      parameters: {
+        type: "object",
+        properties: {
+          start: {
+            type: "string",
+            description:
+              "RFC3339 timestamp with timezone. Example: 2026-06-16T00:00:00Z",
+          },
+          end: {
+            type: "string",
+            description:
+              "RFC3339 timestamp with timezone. Example: 2026-06-17T00:00:00Z",
+          },
+        },
+        required: ["start", "end"],
+        additionalProperties: false,
+      },
+      strict: true,
+    },
+    {
+      type: "function",
+      name: "createEvent",
+      description: "Create a new calendar event.",
+      parameters: {
+        type: "object",
+        properties: {
+          title: {
+            type: "string",
+            description: "Event name",
+          },
+          description: {
+            type: "string",
+            description: "Event details (optional)",
+          },
+          start: {
+            type: "string",
+            description:
+              "Start time as RFC3339 with timezone. Example: 2026-06-16T14:00:00Z",
+          },
+          end: {
+            type: "string",
+            description:
+              "End time as RFC3339 with timezone. Example: 2026-06-16T15:00:00Z",
+          },
+        },
+        required: ["title", "start", "end"],
+        additionalProperties: false,
+      },
+      strict: true,
+    },
+    {
+      type: "function",
+      name: "updateEvent",
+      description:
+        "Update an existing calendar event. If a field is not being updated, use the existing value from a previous query.",
+      parameters: {
+        type: "object",
+        properties: {
+          eventId: {
+            type: "string",
+            description: "Event ID to update",
+          },
+          title: {
+            type: "string",
+            description: "New event title",
+          },
+          description: {
+            type: "string",
+            description: "New event description",
+          },
+          startDateTime: {
+            type: "string",
+            description: "New start time as RFC3339 with timezone",
+          },
+          endDateTime: {
+            type: "string",
+            description: "New end time as RFC3339 with timezone",
+          },
+        },
+        required: [
+          "eventId",
+          "title",
+          "description",
+          "startDateTime",
+          "endDateTime",
+        ],
+        additionalProperties: false,
+      },
+      strict: true,
+    },
+    {
+      type: "function",
+      name: "deleteEvent",
+      description: "Delete a calendar event by ID.",
+      parameters: {
+        type: "object",
+        properties: {
+          eventId: {
+            type: "string",
+            description: "Event ID to delete",
+          },
+        },
+        required: ["eventId"],
+        additionalProperties: false,
+      },
+      strict: true,
+    },
+  ];
+
+  const response = await openai.responses.create({
+    model: "gpt-4o",
+    instructions:
+      "You are a helpful assistant that manages calendar events. Use the provided tools to get, create, update, and delete events based on user requests.",
+    tools,
+    input,
+  });
+
+  // Make the tool call
+  for (const item of response.output) {
+    if (item.type === "getEvents") {
+      const { start, end } = JSON.parse(item.arguments);
+      const events = await getEvents(oauth2Client, start, end);
+
+      input.push({
+        type: "function_call_output",
+        call_id: item.call_id,
+        output: events,
+      });
+    } else if (item.type === "createEvent") {
+      const { title, description, start, end } = JSON.parse(item.arguments);
+      const result = await createEvent(oauth2Client, {
+        title,
+        description,
+        start,
+        end,
+      });
+
+      input.push({
+        type: "function_call_output",
+        call_id: item.call_id,
+        output: result,
+      });
+    } else if (item.type === "updateEvent") {
+      const { eventId, title, description, startDateTime, endDateTime } =
+        JSON.parse(item.arguments);
+      const result = await updateEvent(oauth2Client, {
+        eventId,
+        title,
+        description,
+        startDateTime,
+        endDateTime,
+      });
+
+      input.push({
+        type: "function_call_output",
+        call_id: item.call_id,
+        output: result,
+      });
+    } else if (item.type === "deleteEvent") {
+      const { eventId } = JSON.parse(item.arguments);
+      const result = await deleteEvent(oauth2Client, { eventId });
+
+      input.push({
+        type: "function_call_output",
+        call_id: item.call_id,
+        output: result,
+      });
+    }
+  }
+
+  response = await openai.responses.create({
+    model: "gpt-4o",
+    instructions: "Inform the user of the result of a tool call.",
+    tools,
+    input,
+  });
+
+  res.json({ message: response.output_text });
 });
 
 // Start server

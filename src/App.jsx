@@ -29,6 +29,7 @@ export default function App() {
         body: formData,
       },
     );
+    console.log(response);
 
     const data = await response.json();
     console.log(data);
@@ -51,7 +52,19 @@ export default function App() {
         "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";
 
       const text = await transcribe(audioBlob);
-      console.log(text)
+
+      // Send the text to the backend to process with GPT and manage calendar events
+      const response = await fetch("http://localhost:3000/speech", {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ text }),
+      });
+
+      const data = await response.json();
+      console.log("Response from server:", data);
+      alert(data.message);
     };
 
     recorder.start();
