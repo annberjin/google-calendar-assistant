@@ -59,7 +59,6 @@ export async function updateEvent(
     },
     description: description,
     summary: title,
-    title: title,
   });
 
   if (res.status !== 200) {
