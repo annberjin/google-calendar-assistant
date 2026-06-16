@@ -1,17 +1,13 @@
-import express, { response } from "express";
+import express from "express";
 import dotenv from "dotenv";
 import OpenAI from "openai";
-import { getEvents } from "./calendar.js";
+import { deleteEvent, getEvents, createEvent, updateEvent } from "./calendar.js";
 import { google } from "googleapis";
-import { oauth2 } from "googleapis/build/src/apis/oauth2/index.js";
-
-console.log(process.env.OPENAI_API_KEY);
-const openai = new OpenAI({
-  apiKey:
-    "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",
-});
 
 dotenv.config();
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 const app = express();
 
 const PORT = 3000;
@@ -188,16 +184,16 @@ app.get("/speech", async (req, res) => {
 
   // Make the tool call
   for (const item of response.output) {
-    if (item.type === "getEvents") {
+    if (item.name === "getEvents") {
       const { start, end } = JSON.parse(item.arguments);
       const events = await getEvents(oauth2Client, start, end);
 
       input.push({
         type: "function_call_output",
         call_id: item.call_id,
-        output: events,
+        output: JSON.stringify(events),
       });
-    } else if (item.type === "createEvent") {
+    } else if (item.name === "createEvent") {
       const { title, description, start, end } = JSON.parse(item.arguments);
       const result = await createEvent(oauth2Client, {
         title,
@@ -209,9 +205,9 @@ app.get("/speech", async (req, res) => {
       input.push({
         type: "function_call_output",
         call_id: item.call_id,
-        output: result,
+        output: JSON.stringify(result),
       });
-    } else if (item.type === "updateEvent") {
+    } else if (item.name === "updateEvent") {
       const { eventId, title, description, startDateTime, endDateTime } =
         JSON.parse(item.arguments);
       const result = await updateEvent(oauth2Client, {
@@ -225,28 +221,30 @@ app.get("/speech", async (req, res) => {
       input.push({
         type: "function_call_output",
         call_id: item.call_id,
-        output: result,
+        output: JSON.stringify(result),
       });
-    } else if (item.type === "deleteEvent") {
+    } else if (item.name === "deleteEvent") {
       const { eventId } = JSON.parse(item.arguments);
       const result = await deleteEvent(oauth2Client, { eventId });
 
       input.push({
         type: "function_call_output",
         call_id: item.call_id,
-        output: result,
+        output: JSON.stringify(result),
       });
     }
   }
 
-  response = await openai.responses.create({
+  input.push(...response.output);
+
+  const status = await openai.responses.create({
     model: "gpt-4o",
     instructions: "Inform the user of the result of a tool call.",
     tools,
     input,
   });
 
-  res.json({ message: response.output_text });
+  res.json({ message: status.output_text });
 });
 
 // Start server

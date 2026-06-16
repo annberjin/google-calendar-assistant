@@ -37,6 +37,8 @@ export default function App() {
   };
 
   const startRecording = async () => {
+    audioStreamRef.current = [];
+
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     const recorder = new MediaRecorder(stream);
 
@@ -54,13 +56,9 @@ export default function App() {
       const text = await transcribe(audioBlob);
 
       // Send the text to the backend to process with GPT and manage calendar events
-      const response = await fetch("http://localhost:3000/speech", {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ text }),
-      });
+      const response = await fetch(
+        `http://localhost:3000/speech?text=${encodeURIComponent(text)}`,
+      );
 
       const data = await response.json();
       console.log("Response from server:", data);
