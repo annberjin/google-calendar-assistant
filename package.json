@@ -2,12 +2,17 @@
   "name": "google-calendar-assistant",
   "version": "1.0.0",
   "description": "Voice assistant for Google Calendar",
+  "type": "module",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "dev": "nodemon server.js"
   },
   "dependencies": {
     "express": "^4.19.2",
     "googleapis": "^134.0.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
   }
 }
