@@ -89,3 +89,34 @@ export async function deleteEvent(auth, eventId) {
     return "Event deleted successfully";
   }
 }
+
+export async function createEvent(auth, { title, description, start, end }) {
+  const calendar = google.calendar({
+    version: "v3",
+    auth,
+  });
+
+  const event = {
+    summary: title,
+    description: description || "",
+    start: {
+      dateTime: start, 
+    },
+    end: {
+      dateTime: end,  
+    },
+  };
+
+  const res = await calendar.events.insert({
+    calendarId: "primary",
+    resource: event,
+  });
+
+  return {
+    id: res.data.id,
+    title: res.data.summary,
+    start: res.data.start?.dateTime,
+    end: res.data.end?.dateTime,
+    link: res.data.htmlLink,
+  };
+} 
