@@ -1,5 +1,10 @@
 import express, { response } from "express";
 import dotenv from "dotenv";
+import OpenAI from "openai";
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
 dotenv.config();
 const app = express();
@@ -39,6 +44,10 @@ app.get("/callback", async (req, res) => {
   console.log(data)
   res.redirect(`http://localhost:5173`);
 });
+
+app.get("/speech", async (req, res) => {
+  const text = req.query.text;
+})
 
 // Start server
 app.listen(PORT, () => {
