@@ -1,7 +1,13 @@
 import express from "express";
 import dotenv from "dotenv";
 import OpenAI from "openai";
-import { deleteEvent, getEvents, createEvent, updateEvent } from "./calendar.js";
+import cors from "cors";
+import {
+  deleteEvent,
+  getEvents,
+  createEvent,
+  updateEvent,
+} from "./calendar.js";
 import { google } from "googleapis";
 
 dotenv.config();
@@ -9,6 +15,11 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 const app = express();
+app.use(
+  cors({
+    origin: "http://localhost:5173",
+  }),
+);
 
 const PORT = 3000;
 
@@ -97,7 +108,7 @@ app.get("/speech", async (req, res) => {
           },
           description: {
             type: "string",
-            description: "Event details (optional)",
+            description: "Event details",
           },
           start: {
             type: "string",
@@ -110,7 +121,7 @@ app.get("/speech", async (req, res) => {
               "End time as RFC3339 with timezone. Example: 2026-06-16T15:00:00Z",
           },
         },
-        required: ["title", "start", "end"],
+        required: ["title", "description", "start", "end"],
         additionalProperties: false,
       },
       strict: true,
@@ -237,10 +248,10 @@ app.get("/speech", async (req, res) => {
 
   input.push(...response.output);
 
+
   const status = await openai.responses.create({
     model: "gpt-4o",
     instructions: "Inform the user of the result of a tool call.",
-    tools,
     input,
   });
 

@@ -10,6 +10,7 @@
     "dev:all": "concurrently \"npm start\" \"npm run dev\""
   },
   "dependencies": {
+    "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^4.19.2",
     "googleapis": "^134.0.0",

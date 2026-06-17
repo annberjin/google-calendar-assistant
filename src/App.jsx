@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 
 export default function App() {
   const [listening, setListening] = useState(false);
+  const [text, setText] = useState("");
   const audioStreamRef = useRef([]);
   const recorderRef = useRef(null);
 
@@ -24,7 +25,7 @@ export default function App() {
       {
         method: "POST",
         headers: {
-          Authorization: `Bearer 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`,
+          Authorization: `Bearer ${import.meta.env.VITE_OPENAI_KEY}`,
         },
         body: formData,
       },
@@ -50,10 +51,10 @@ export default function App() {
       const audioBlob = new Blob(audioStreamRef.current, {
         type: "audio/webm",
       });
-      const key =
-        "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";
+      const key = import.meta.env.VITE_OPENAI_KEY;
 
       const text = await transcribe(audioBlob);
+      setText(text);
 
       // Send the text to the backend to process with GPT and manage calendar events
       const response = await fetch(
@@ -87,6 +88,7 @@ export default function App() {
         <button onClick={startRecording}>Start Recording</button>
       )}
       {listening && <p>Listening...</p>}
+      {text && <p>Transcribed Text: {text}</p>}
     </div>
   );
 }
